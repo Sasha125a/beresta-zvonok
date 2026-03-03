@@ -80,7 +80,6 @@ app.get('/', (req, res) => {
             if (!roomId) return;
             
             try {
-                // Запрашиваем доступ к камере и микрофону
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 document.getElementById('localVideo').srcObject = localStream;
                 
@@ -90,24 +89,21 @@ app.get('/', (req, res) => {
                 document.getElementById('setup').style.display = 'none';
                 document.getElementById('videos').style.display = 'block';
                 document.getElementById('controls').style.display = 'block';
-                document.getElementById('roomStatus').innerHTML = \`<span class="success">Joined room: \${roomId}</span>\`;
+                document.getElementById('roomStatus').innerHTML = '<span class="success">Joined room: ' + roomId + '</span>';
             } catch (err) {
-                document.getElementById('status').innerHTML = \`<span class="error">Error: \${err.message}</span>\`;
+                document.getElementById('status').innerHTML = '<span class="error">Error: ' + err.message + '</span>';
             }
         }
         
         socket.on('peer-joined', async (peerId) => {
             document.getElementById('status').innerHTML = '<span class="success">Peer joined, establishing connection...</span>';
             
-            // Создаём peer connection
             peerConnection = new RTCPeerConnection(configuration);
             
-            // Добавляем локальные треки
             localStream.getTracks().forEach(track => {
                 peerConnection.addTrack(track, localStream);
             });
             
-            // Обработка ICE кандидатов
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
                     socket.emit('ice-candidate', {
@@ -117,12 +113,10 @@ app.get('/', (req, res) => {
                 }
             };
             
-            // Обработка удалённого потока
             peerConnection.ontrack = (event) => {
                 document.getElementById('remoteVideo').srcObject = event.streams[0];
             };
             
-            // Создаём и отправляем оффер
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
             
@@ -239,32 +233,28 @@ io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
   socket.on('join-room', (roomId) => {
-    // Проверяем, существует ли комната
     if (!rooms.has(roomId)) {
       rooms.set(roomId, new Set());
     }
     
     const room = rooms.get(roomId);
     
-    // Ограничиваем комнату до 2 участников (для простоты)
     if (room.size >= 2) {
       socket.emit('room-full');
       return;
     }
     
-    // Добавляем пользователя в комнату
     room.add(socket.id);
     userRooms.set(socket.id, roomId);
     socket.join(roomId);
     
-    console.log(\`Socket \${socket.id} joined room \${roomId}. Participants: \${room.size}\`);
+    console.log('Socket ' + socket.id + ' joined room ' + roomId + '. Participants: ' + room.size);
     
-    // Уведомляем других участников о новом подключении
     socket.to(roomId).emit('peer-joined', socket.id);
   });
 
   socket.on('offer', (data) => {
-    console.log(\`Offer from \${socket.id} to \${data.target}\`);
+    console.log('Offer from ' + socket.id + ' to ' + data.target);
     socket.to(data.target).emit('offer', {
       offer: data.offer,
       sender: socket.id
@@ -272,7 +262,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('answer', (data) => {
-    console.log(\`Answer from \${socket.id} to \${data.target}\`);
+    console.log('Answer from ' + socket.id + ' to ' + data.target);
     socket.to(data.target).emit('answer', {
       answer: data.answer,
       sender: socket.id
@@ -280,7 +270,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('ice-candidate', (data) => {
-    console.log(\`ICE candidate from \${socket.id} to \${data.target}\`);
+    console.log('ICE candidate from ' + socket.id + ' to ' + data.target);
     socket.to(data.target).emit('ice-candidate', {
       candidate: data.candidate,
       sender: socket.id
@@ -303,15 +293,13 @@ function handleDisconnect(socket, specificRoom = null) {
     const room = rooms.get(roomId);
     room.delete(socket.id);
     
-    // Уведомляем остальных в комнате
     socket.to(roomId).emit('peer-disconnected');
     
-    // Очищаем комнату если она пуста
     if (room.size === 0) {
       rooms.delete(roomId);
     }
     
-    console.log(\`Socket \${socket.id} left room \${roomId}\`);
+    console.log('Socket ' + socket.id + ' left room ' + roomId);
   }
   
   userRooms.delete(socket.id);
@@ -319,6 +307,6 @@ function handleDisconnect(socket, specificRoom = null) {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(\`Server running on port \${PORT}\`);
-  console.log(\`Open http://localhost:\${PORT} in two browsers to test\`);
+  console.log('Server running on port ' + PORT);
+  console.log('Open http://localhost:' + PORT + ' in two browsers to test');
 });
